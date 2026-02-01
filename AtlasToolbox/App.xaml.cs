@@ -231,17 +231,49 @@ namespace AtlasToolbox
             mainWindow.ContentDialogContoller(type);
         }
 
+        private static string _cachedLang = "";
+        private static Dictionary<string, string> _cachedLangData = null;
+
+        public static void ClearLangCache()
+        {
+            _cachedLang = "";
+            _cachedLangData = null;
+        }
+
         public static void LoadLangString()
         {
+            string lang = (string)RegistryHelper.GetValue(@"HKLM\SOFTWARE\AtlasOS\Services\Toolbox", "lang");
+            
+            // 如果语言没有变化，直接使用缓存
+            if (lang == _cachedLang && _cachedLangData != null)
+            {
+                StringList = _cachedLangData;
+                return;
+            }
+            
             try
             {
-                string lang = (string)RegistryHelper.GetValue(@"HKLM\SOFTWARE\AtlasOS\Services\Toolbox", "lang");
-                StringList = JsonConvert.DeserializeObject<Dictionary<string, string>>(File.ReadAllText(@$"lang\{lang}.json"));
+                _cachedLangData = JsonConvert.DeserializeObject<Dictionary<string, string>>(File.ReadAllText(@$"lang\{lang}.json"));
+                _cachedLang = lang;
+                StringList = _cachedLangData;
             } catch
             {
                 RegistryHelper.SetValue(@"HKLM\SOFTWARE\AtlasOS\Services\Toolbox", "lang", "en_us");
-                string lang = (string)RegistryHelper.GetValue(@"HKLM\SOFTWARE\AtlasOS\Services\Toolbox", "lang");
-                StringList = JsonConvert.DeserializeObject<Dictionary<string, string>>(File.ReadAllText(@$"lang\{lang}.json"));
+                lang = (string)RegistryHelper.GetValue(@"HKLM\SOFTWARE\AtlasOS\Services\Toolbox", "lang");
+                
+                try
+                {
+                    _cachedLangData = JsonConvert.DeserializeObject<Dictionary<string, string>>(File.ReadAllText(@$"lang\{lang}.json"));
+                    _cachedLang = lang;
+                    StringList = _cachedLangData;
+                }
+                catch
+                {
+                    // 如果所有尝试都失败，使用英文
+                    _cachedLangData = JsonConvert.DeserializeObject<Dictionary<string, string>>(File.ReadAllText(@$"lang\en_us.json"));
+                    _cachedLang = "en_us";
+                    StringList = _cachedLangData;
+                }
             }
         }
 

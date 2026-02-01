@@ -33,11 +33,32 @@ namespace AtlasToolbox.ViewModels
         protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {
             RegistryHelper.SetValue(@"HKLM\SOFTWARE\AtlasOS\Services\Toolbox", "lang", this.CurrentLanguage.Key);
+            // 清除语言缓存，确保下次加载新语言
+            App.ClearLangCache();
             App.LoadLangString();
             MainWindow mWindows = App.m_window as MainWindow;
         }
 
         public ObservableCollection<Language> Languages { get; set; }
+        private static readonly Dictionary<string, string> _languageMapping = new()
+        {
+            ["zh-tw"] = "zh_tw",
+            ["zh-hk"] = "zh_tw",
+            ["zh-mo"] = "zh_tw",
+            ["zh-cn"] = "zh_cn",
+            ["zh-sg"] = "zh_cn",
+            ["es"] = "es_es",
+            ["es-es"] = "es_es",
+            ["fr"] = "fr_fr",
+            ["fr-fr"] = "fr_fr",
+            ["pt"] = "pt_pt",
+            ["pt-pt"] = "pt_pt",
+            ["pt-br"] = "pt_br",
+            ["ru"] = "ru_ru",
+            ["ru-ru"] = "ru_ru",
+            ["sv"] = "sv_se",
+            ["sv-se"] = "sv_se"
+        };
 
         public SettingsPageViewModel()
         {
@@ -48,7 +69,49 @@ namespace AtlasToolbox.ViewModels
                 Languages.Add(new (language.Value, language.Key));
             }
             string lang = (string)RegistryHelper.GetValue(@"HKLM\SOFTWARE\AtlasOS\Services\Toolbox", "lang");
-            CurrentLanguage = Languages.Where(item => item.Key == lang).FirstOrDefault();
+            
+            // 如果没有手动选择过语言，则根据系统语言自动选择
+            if (string.IsNullOrEmpty(lang))
+            {
+                lang = GetSystemLanguage();
+            }
+            
+            CurrentLanguage = Languages.FirstOrDefault(item => item.Key == lang);
+        }
+
+        private string GetSystemLanguage()
+        {
+            string systemLang = System.Globalization.CultureInfo.CurrentCulture.Name.ToLower();
+            
+            // 首先尝试精确匹配
+            if (_languageMapping.TryGetValue(systemLang, out string mappedLang))
+            {
+                return mappedLang;
+            }
+            
+            // 尝试前缀匹配
+            foreach (var mapping in _languageMapping)
+            {
+                if (systemLang.StartsWith(mapping.Key))
+                {
+                    return mapping.Value;
+                }
+            }
+            
+            // 检查中文变体
+            if (systemLang.StartsWith("zh-"))
+            {
+                return Languages.Any(l => l.Key == "zh_tw") ? "zh_tw" : "zh_cn";
+            }
+            
+            // 检查葡萄牙语变体
+            if (systemLang.StartsWith("pt-"))
+            {
+                return systemLang.Contains("br") || systemLang.Contains("brazil") ? "pt_br" : "pt_pt";
+            }
+            
+            // 默认英文
+            return "en_us";
         }
 
         public bool CheckUpdates()
